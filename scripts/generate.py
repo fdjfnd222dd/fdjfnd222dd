@@ -107,7 +107,9 @@ def collect():
     d = {}
     repos = api(f"/users/{USER}/repos?per_page=100&type=owner") or []
     own = [r for r in repos if not r.get("fork") and r["name"].lower() != USER.lower()]
-    d["repos"] = safe(lambda: len(own) if repos else None)
+    forks = sum(1 for r in repos if r.get("fork"))
+    d["repos"] = safe(lambda: (f"{len(repos)} public" + (f" \u00b7 {forks} fork" + ("s" if forks != 1 else "") if forks else "")) if repos else None)
+    d["nrepos"] = len(repos) if repos else NA
 
     def langs():
         tot = {}
@@ -121,42 +123,48 @@ def collect():
     now = dt.datetime.now(dt.timezone.utc)
     year = now.year
 
-    # Commits come from the public repos' own commit lists (author=USER), so the
-    # numbers match what visitors can verify. The GraphQL contributionsCollection
-    # also counts private/org work, which would not match the repos shown here;
-    # it is only the fallback when the REST listing fails entirely.
-    dates = []
-    ok = bool(own)
-    for r in own:
-        page = 1
-        while page <= 5:
-            cs = api(f"/repos/{USER}/{r['name']}/commits?per_page=100&page={page}&since={year}-01-01T00:00:00Z")
-            if cs is None:
-                ok = False
-                break
-            dates += [c["commit"]["author"]["date"][:10] for c in cs]
-            if len(cs) < 100:
-                break
-            page += 1
-    if ok:
-        d["commits"] = f"{len(dates)} in {year}"
-        days = sorted(set(dates))
-        best = run = 0
-        prev = None
-        for x in days:
-            cur = dt.date.fromisoformat(x)
-            run = run + 1 if prev and (cur - prev).days == 1 else 1
-            best, prev = max(best, run), cur
-        d["streak"] = f"{len(days)} active day{'s' if len(days) != 1 else ''}, best streak {best}"
-    else:
-        g = api("/graphql", {"query": "query($u:String!,$f:DateTime!){user(login:$u){contributionsCollection(from:$f){totalCommitContributions}}}",
-                             "variables": {"u": USER, "f": f"{year}-01-01T00:00:00Z"}})
-        d["commits"] = safe(lambda: f"{g['data']['user']['contributionsCollection']['totalCommitContributions']} in {year}")
-        d["streak"] = NA
+    # Total activity, honestly: GraphQL contributionsCollection counts public commits
+    # plus private ones (restrictedContributionsCount) when the owner has enabled
+    # "include private contributions" on their profile. Public-repo commit lists
+    # are only the fallback if GraphQL is unavailable (e.g. no token).
+    cc = None
+    g = api("/graphql", {"query": """query($u:String!,$f:DateTime!){user(login:$u){
+        contributionsCollection(from:$f){totalCommitContributions restrictedContributionsCount
+        contributionCalendar{weeks{contributionDays{date contributionCount}}}}}}""",
+                         "variables": {"u": USER, "f": f"{year}-01-01T00:00:00Z"}})
+    try:
+        cc = g["data"]["user"]["contributionsCollection"]
+    except Exception:
+        pass
+    d["commits"] = safe(lambda: f"{cc['totalCommitContributions'] + cc['restrictedContributionsCount']} in {year}")
+
+    def active():
+        days = [x for w in cc["contributionCalendar"]["weeks"] for x in w["contributionDays"]]
+        n = sum(1 for x in days if x["contributionCount"] > 0)
+        return f"{n} days in {year}"
+    d["active"] = safe(active)
+
+    if cc is None:  # fallback: public commit lists
+        dates, ok = [], bool(own)
+        for r in own:
+            for page in range(1, 6):
+                cs = api(f"/repos/{USER}/{r['name']}/commits?per_page=100&page={page}&since={year}-01-01T00:00:00Z")
+                if cs is None:
+                    ok = False
+                    break
+                dates += [c["commit"]["author"]["date"][:10] for c in cs]
+                if len(cs) < 100:
+                    break
+        if ok:
+            d["commits"] = f"{len(dates)} in {year}"
+            n = len(set(dates))
+            d["active"] = f"{n} days in {year}"
+
+    prof = api(f"/users/{USER}") or {}
+    d["uptime_days"] = safe(lambda: (now - parse_ts(prof["created_at"])).days)
 
     firsts = sorted(r["created_at"] for r in own)
     d["since"] = safe(lambda: firsts[0][:4])
-    d["uptime_days"] = safe(lambda: (now - parse_ts(firsts[0])).days)
 
     cnt = [0]
 
@@ -318,9 +326,10 @@ def fetch_svg(d):
     langs = d["langs"] if isinstance(d["langs"], list) else None
     lang_txt = "  ".join(f"{k} {v * 100:.0f}%" for k, v in langs[:3]) if langs else NA
     rows = [
-        ("repos", f"{d['repos']} public"),
+        ("repos", d["repos"]),
         ("langs", lang_txt),
         ("commits", d["commits"]),
+        ("active", d["active"]),
         ("release", d["release"] if d["release"] == NA else f"{d['release']} \u00b7 {d['relcount']}"),
         ("topics", d["topics"]),
         ("featured", " · ".join(FEATURED)),
@@ -400,7 +409,7 @@ def build_script(d):
     t = ev[-1][3][-1] + 0.4
     line += 1
     days = d["uptime_days"]
-    up = f"up {days} day{'s' if days != 1 else ''} since first commit, {d['repos']} public repos" if days != NA else f"up {NA} since first commit, {d['repos']} public repos"
+    up = f"up {days} day{'s' if days != 1 else ''} since first commit, {d['nrepos']} public repos" if days != NA else f"up {NA} since first commit, {d['nrepos']} public repos"
     ev.append(("out", line, [(up, "", 0)], round(t, 3)))
     line += 1
     # 3) tail -1 activity.log
