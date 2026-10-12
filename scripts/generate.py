@@ -19,8 +19,6 @@ rest still render. This script never raises.
 
 Usage:
   python scripts/generate.py                    # writes assets/*.svg
-  python scripts/generate.py --assume-published # local preview: also list the repos
-                                                # that are about to go public
   python scripts/generate.py --preview DIR      # static terminal frames for PNG review
 """
 import datetime as dt
@@ -40,15 +38,6 @@ NA = "n/a"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Display order; anything else public follows, newest push first. Forks go last.
 ORDER = ["ctop-tui", "formhand", "pi-robot-cam", "jobbot", "net-toolkit", "letterstore", USER, "spiff-arena"]
-# Only used with --assume-published (repos that are private right now).
-PENDING = {
-    "pi-robot-cam": "Raspberry Pi robot you can watch and drive from a phone",
-    "jobbot": "Local job-application driver for Firefox, built on Formhand",
-    USER: "Profile README",
-    "net-toolkit": "Networking CLI toolkit: subnet/VLSM calc, scanner, Netmiko backup+diff, IOS config audit, pcap summary",
-    "letterstore": "Streetwear storefront demo: Next.js 14, Tailwind, static catalog",
-}
-
 # ---- Windows 95 palette (system colours) and fonts
 FACE, DK, MID, LT, NAVY, TEAL = "#c0c0c0", "#000000", "#808080", "#ffffff", "#000080", "#008080"
 UI = "Tahoma, 'MS Sans Serif', Verdana, 'DejaVu Sans', sans-serif"
@@ -107,7 +96,7 @@ def short(s, n=46):
     return s.rstrip(".")
 
 
-def collect(assume_published=False):
+def collect():
     d = {}
     now = dt.datetime.now(dt.timezone.utc)
     d["now"] = now
@@ -115,13 +104,13 @@ def collect(assume_published=False):
     rows = []
     for n in list(ORDER) + sorted((k for k in repos if k not in ORDER), key=lambda k: repos[k]["pushed_at"], reverse=True):
         r = repos.get(n)
-        if r is None and not (assume_published and n in PENDING):
+        if r is None:
             continue
-        r = r or {}
+        fork = bool(r.get("fork"))
         rows.append(dict(
-            name=n, desc=short(r.get("description") or PENDING.get(n) or NA),
-            pushed=(r.get("pushed_at") or now.strftime("%Y-%m-%d"))[:10],
-            stars=r.get("stargazers_count", 0), fork=bool(r.get("fork"))))
+            name=n, desc=short(r.get("description") or NA),
+            type="Fork" if fork else (r.get("language") or "n/a"),
+            stars=r.get("stargazers_count", 0), fork=fork))
     rows.sort(key=lambda x: x["fork"])  # stable: forks last, ORDER kept
     d["rows"] = rows
     d["nrepos"] = len(rows) if rows else NA
@@ -282,9 +271,9 @@ def window_svg(d, ramp=HEAT):
     # Stars column only when at least one repo has stars; otherwise Description widens.
     stars = any(r["stars"] for r in rows)
     if stars:
-        cols = [(18, 140, "Name"), (158, 424, "Description"), (582, 110, "Pushed"), (692, lw - 692 + 10, "Stars")]
+        cols = [(18, 140, "Name"), (158, 424, "Description"), (582, 110, "Type"), (692, lw - 692 + 10, "Stars")]
     else:
-        cols = [(18, 140, "Name"), (158, 574, "Description"), (732, lw - 732 + 10, "Pushed")]
+        cols = [(18, 140, "Name"), (158, 574, "Description"), (732, lw - 732 + 10, "Type")]
     px = cols[2][0] + 6
     for x, w, t in cols:
         bevel(o, x, listy + 3, w, 20)
@@ -297,10 +286,10 @@ def window_svg(d, ramp=HEAT):
                      f'<rect x="18.5" y="{y + .5}" width="{lw - 9}" height="{rowh - 1}" fill="none" stroke="{LT}" stroke-dasharray="1 1"/>')
         col = LT if sel else DK
         ty = y + 14
-        nm = clean(r["name"]) + (" (fork)" if r["fork"] else "")
+        nm = clean(r["name"])
         o.append(f'<text x="24" y="{ty}" fill="{col}" class="ui">{nm}</text>')
         o.append(f'<text x="164" y="{ty}" fill="{col}" class="ui">{clean(r["desc"])}</text>')
-        o.append(f'<text x="{px}" y="{ty}" fill="{col}" class="ui num">{r["pushed"]}</text>')
+        o.append(f'<text x="{px}" y="{ty}" fill="{col}" class="ui">{clean(r["type"])}</text>')
         if r["stars"]:
             o.append(f'<text x="698" y="{ty}" fill="{col}" class="ui num">{r["stars"]}</text>')
         y += rowh
@@ -371,8 +360,7 @@ def build_script(d):
     out(" Directory of C:\\GITHUB", t); t += 0.15
     out("", t); t += 0.0
     for r in d["rows"]:
-        tag = "<DIR>" if not r["fork"] else "<DIR> fork"
-        out(f"{r['name']:<16}{tag:<12}{r['pushed']}", t); t += 0.14
+        out(f"{r['name']:<16}{'<DIR>':<8}{r['type']}", t); t += 0.14
     out(f"{len(d['rows']):>8} dir(s)", t)
     t += 1.3
     cmd("type stats.txt")
@@ -471,7 +459,7 @@ def terminal_svg(d, mode="reduced", at=None):
 
 
 def main():
-    d = collect("--assume-published" in sys.argv)
+    d = collect()
     printable = {k: v for k, v in d.items() if k not in ("weeks", "now")}
     print(json.dumps(printable, indent=1, default=str), file=sys.stderr)
     os.makedirs(os.path.join(ROOT, "assets"), exist_ok=True)
