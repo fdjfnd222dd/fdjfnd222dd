@@ -39,12 +39,13 @@ HANDLE = "nb"
 NA = "n/a"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Display order; anything else public follows, newest push first. Forks go last.
-ORDER = ["ctop-tui", "formhand", "pi-robot-cam", "jobbot", "letterstore", USER, "spiff-arena"]
+ORDER = ["ctop-tui", "formhand", "pi-robot-cam", "jobbot", "net-toolkit", "letterstore", USER, "spiff-arena"]
 # Only used with --assume-published (repos that are private right now).
 PENDING = {
     "pi-robot-cam": "Raspberry Pi robot you can watch and drive from a phone",
     "jobbot": "Local job-application driver for Firefox, built on Formhand",
     USER: "Profile README",
+    "net-toolkit": "Networking CLI toolkit: subnet/VLSM calc, scanner, Netmiko backup+diff, IOS config audit, pcap summary",
     "letterstore": "Streetwear storefront demo: Next.js 14, Tailwind, static catalog",
 }
 
