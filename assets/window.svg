@@ -326,7 +326,7 @@
 <rect x="506" y="324" width="11" height="11" fill="#e4e4e4"/>
 <rect x="506" y="338" width="11" height="11" fill="#004848"/>
 <rect x="506" y="352" width="11" height="11" fill="#4da6a6"/>
-<rect x="506" y="366" width="11" height="11" fill="#99cccc"/>
+<rect x="506" y="366" width="11" height="11" fill="#4da6a6"/>
 <rect x="506" y="380" width="11" height="11" fill="#008080"/>
 <rect x="506" y="394" width="11" height="11" fill="#e4e4e4"/>
 <rect x="520" y="310" width="11" height="11" fill="#008080"/>
@@ -480,7 +480,7 @@
 <path d="M297.5 452V471.5H8" stroke="#ffffff" fill="none" shape-rendering="crispEdges"/>
 <path d="M9.5 471V453.5H297" stroke="#808080" fill="none" shape-rendering="crispEdges"/>
 <path d="M296.5 453V470.5H9" stroke="#c0c0c0" fill="none" shape-rendering="crispEdges"/>
-<text x="14" y="466" fill="#000000" class="ui">1279 contributions, last 365 days</text>
+<text x="14" y="466" fill="#000000" class="ui">1281 contributions, last 365 days</text>
 <path d="M300.5 472V452.5H450" stroke="#000000" fill="none" shape-rendering="crispEdges"/>
 <path d="M449.5 452V471.5H300" stroke="#ffffff" fill="none" shape-rendering="crispEdges"/>
 <path d="M301.5 471V453.5H449" stroke="#808080" fill="none" shape-rendering="crispEdges"/>
