@@ -25,6 +25,7 @@ import random
 import re
 import subprocess
 import sys
+import textwrap
 import urllib.request
 from xml.sax.saxutils import escape
 
@@ -157,16 +158,32 @@ def collect():
     d["since"] = safe(lambda: firsts[0][:4])
     d["uptime_days"] = safe(lambda: (now - parse_ts(firsts[0])).days)
 
+    cnt = [0]
+
     def release():
         best = None
         for r in own:
             rel = api(f"/repos/{USER}/{r['name']}/releases/latest")
             if rel and rel.get("tag_name"):
+                cnt[0] += 1
                 t = rel.get("published_at") or rel.get("created_at")
                 if best is None or t > best[0]:
                     best = (t, f"{r['name']}@{rel['tag_name']}")
         return best[1] if best else None
     d["release"] = safe(release)
+    d["relcount"] = f"{cnt[0]} tagged" if d["release"] != NA else NA
+
+    def topics():
+        c = {}
+        for r in own:
+            for t in r.get("topics") or []:
+                c[t] = c.get(t, 0) + 1
+        top = []
+        for t in sorted(c, key=lambda t: (-c[t], t))[:4]:  # up to 4, as many as fit the card
+            if len(" \u00b7 ".join(top + [t])) <= 40:
+                top.append(t)
+        return " \u00b7 ".join(top) if top else None
+    d["topics"] = safe(topics)
 
     by = {r["name"]: r for r in repos}
     d["featured"] = []
@@ -239,11 +256,17 @@ text{{font-family:{MONO};font-size:14px;fill:{FG}}}
 
 
 # ------------------------------------------------------------------ fetch.svg
-N = ["           ", "           ", "███▄▄▄▄▄▄   ", "███▀▀▀▀▀██▄ ", "███     ▀██ ",
-     "███      ██ ", "███      ██ ", "███      ██ ", "███      ██ ", "███      ██ "]
-B = ["███        ", "███        ", "███▄▄▄▄▄▄   ", "███▀▀▀▀▀██▄ ", "███     ▀██ ",
-     "███      ██ ", "███      ██ ", "███     ▄██ ", "███▄▄▄▄██▀  ", "█████████▀  "]
-LOGO = [a.ljust(12) + b.ljust(12) for a, b in zip(N, B)]
+# 12-col glyphs, 3-col vertical strokes, ~1-row horizontal strokes, chamfered corners.
+N = ["", "",
+     "███" + "▄" * 8,
+     "███" + "▀" * 6 + "███",
+     "███      ███", "███      ███", "███      ███", "███      ███", "███      ███", "███      ███"]
+B = ["███", "███",
+     "███" + "▄" * 8,
+     "███" + "▀" * 6 + "███",
+     "███      ███", "███      ███", "███      ███", "███      ███", "███      ███",
+     "███████████▀"]
+LOGO = [a.ljust(14) + b.ljust(12) for a, b in zip(N, B)]
 # top-to-bottom accent ramp, same hue family as ctop's blues
 RAMP = ["#8cc4ff", "#7bb9ff", "#6aaeff", "#5ea6ff", "#4ea1ff", "#4a9af2", "#4a92e6", "#4f8fd6", "#4f8fd6", "#4a84c4"]
 
@@ -251,7 +274,7 @@ RAMP = ["#8cc4ff", "#7bb9ff", "#6aaeff", "#5ea6ff", "#4ea1ff", "#4a9af2", "#4a92
 def fetch_svg(d):
     W, H = 860, 392
     cw = 9.6
-    lx = 46
+    lx = 26
     ix, iw = 340, 8.4
     row = 23
     top = 62
@@ -283,28 +306,24 @@ def fetch_svg(d):
             front.append(f'<rect x="{x}" y="{y0}" width="{w}" height="{h}" fill="{RAMP[i]}"/>')
     out.append(f'<g fill="{INK}" shape-rendering="crispEdges">' + "".join(shadow) + "</g>")
     out.append('<g shape-rendering="crispEdges">' + "".join(front) + "</g>")
-    # blinking underscore cursor after the logo, CSS-animated so reduced-motion can stop it
-    cx = lx + 21 * cwp
-    cy = ly + len(LOGO) * 2 * rh
-    out.append(f'<rect class="cur" x="{cx}" y="{cy + 8}" width="{cwp * 2}" height="5" fill="{ACCENT}"/>')
 
     y = top
     out.append(gtext(ix, y, f"{HANDLE}@github", iw, "k"))
     out.append(f'<text x="{ix}" y="{y}" dx="{len(HANDLE + "@github") * iw + 12:.1f}" class="dim">{clean(DISPLAY)}</text>')
+    out.append(f'<text x="{ix + 440}" y="{y}" text-anchor="end" class="dim" style="font-size:12px">@{USER}</text>')
     y += 10
-    out.append(f'<rect x="{ix}" y="{y}" width="{len("nb@github") * iw:.1f}" height="1" fill="{EDGE}"/>')
+    out.append(f'<rect x="{ix}" y="{y}" width="440" height="1" fill="{EDGE}"/>')
     y += row - 4
 
     langs = d["langs"] if isinstance(d["langs"], list) else None
     lang_txt = "  ".join(f"{k} {v * 100:.0f}%" for k, v in langs[:3]) if langs else NA
     rows = [
-        ("handle", f"@{USER}"),
         ("repos", f"{d['repos']} public"),
         ("langs", lang_txt),
         ("commits", d["commits"]),
-        ("streak", d["streak"]),
-        ("since", d["since"]),
         ("release", d["release"]),
+        ("releases", d["relcount"]),
+        ("topics", d["topics"]),
         ("featured", " · ".join(FEATURED)),
         ("updated", f"{d['updated']} by action"),
     ]
@@ -332,8 +351,7 @@ def fetch_svg(d):
     y += 26
     for i, c in enumerate(SWATCH):
         out.append(f'<rect x="{ix + i * 34}" y="{y}" width="30" height="16" rx="3" fill="{c}"/>')
-    css = (".cur{animation:b 1.1s steps(1) infinite}@keyframes b{50%{opacity:0}}"
-           "@media (prefers-reduced-motion:reduce){.cur{animation:none}}")
+    css = ""
     return card(W, H, "\n".join(out), css, f"{HANDLE}@github",
                 f"GitHub activity summary for {USER}, rendered as a system-info card.")
 
@@ -368,9 +386,15 @@ def build_script(d):
     line += 1
     nm = max(len(n) for n, _ in d["featured"]) + 3
     for n, desc in d["featured"]:
-        ev.append(("out", line, [(n + "/", "k", 0), (trunc(desc, 90 - nm - 1), "dim", nm)], round(t, 3)))
+        avail = 90 - nm - 1
+        ws = textwrap.wrap(desc, avail) or [desc]
+        if len(ws) > 2:  # keep it to two lines; ellipsis only if still too long
+            ws = [ws[0], trunc(" ".join(ws[1:]), avail)]
+        for k, w in enumerate(ws):
+            parts = [(n + "/", "k", 0)] if k == 0 else []
+            ev.append(("out", line, parts + [(w, "dim", nm)], round(t, 3)))
+            line += 1
         t += 0.28
-        line += 1
     # 2) uptime
     t += 1.0
     ev.append(("type", line, cmds[1][0], cadence(t, cmds[1][0])))
