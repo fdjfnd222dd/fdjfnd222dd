@@ -1,9 +1,9 @@
 <p align="center">
-  <img src="assets/fetch.svg" alt="nb@github: system-info style summary of repos, languages, commits and latest release" width="860">
+  <img src="assets/window.svg" alt="nb@github Properties window: public repositories and a contribution heatmap" width="860">
 </p>
 
 <p align="center">
-  <img src="assets/terminal.svg" alt="Animated terminal listing projects, uptime and the latest commit" width="860">
+  <img src="assets/terminal.svg" alt="MS-DOS prompt typing dir, type stats.txt and type last.log" width="860">
 </p>
 
 <p align="center">

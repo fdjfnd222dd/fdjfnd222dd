@@ -1,22 +1,27 @@
 #!/usr/bin/env python3
-"""Generate the profile dashboard SVGs (assets/fetch.svg, assets/terminal.svg).
+"""Generate the profile dashboard: assets/window.svg and assets/terminal.svg.
+
+Look: a Windows 95 "Properties" window (repo list + contribution heatmap) and a
+matching "MS-DOS Prompt" that types three commands on a loop.
 
 Why SVG: GitHub strips CSS/JS from README markdown, but renders <img src=*.svg>
-with inline <style> and SMIL animation intact. So everything here is a
-self-contained SVG: no scripts, no external fonts, no external hrefs.
+with inline <style> and SMIL animation intact. Everything is self-contained: no
+scripts, no external fonts, no external hrefs.
 
-Why explicit per-character x positions: monospace fonts differ by a fraction of
-a pixel between systems. Placing every glyph at a computed x keeps the logo,
-columns and typing cursor aligned no matter which font the viewer falls back to.
+Why explicit per-glyph x positions in the DOS window: monospace fonts differ by a
+fraction of a pixel between systems; absolute x keeps columns and the typing
+cursor aligned on whatever font the viewer falls back to. The Win95 window uses
+fixed column x positions with short, pre-shortened text for the same reason.
 
 Data: GitHub REST + GraphQL, token from GITHUB_TOKEN (Actions) or `gh auth token`
-(local). Unauthenticated works for REST only. Every field is independent: if one
-call fails it renders "n/a" and the rest still render. This script never raises.
+(local). Every field is independent: if one call fails it renders "n/a" and the
+rest still render. This script never raises.
 
 Usage:
-  python scripts/generate.py                 # writes assets/*.svg
-  python scripts/generate.py --preview DIR   # also writes static frames of the
-                                             # terminal animation to DIR (for PNG review)
+  python scripts/generate.py                    # writes assets/*.svg
+  python scripts/generate.py --assume-published # local preview: also list the repos
+                                                # that are about to go public
+  python scripts/generate.py --preview DIR      # static terminal frames for PNG review
 """
 import datetime as dt
 import json
@@ -31,32 +36,22 @@ from xml.sax.saxutils import escape
 
 USER = os.environ.get("PROFILE_USER", "fdjfnd222dd")
 HANDLE = "nb"
-DISPLAY = "Nick B"
-FEATURED = ["ctop-tui", "formhand", "pi-robot-cam"]
-# Used only when the API cannot supply a description (e.g. repo not public yet).
-FALLBACK_DESC = {
-    "pi-robot-cam": "Raspberry Pi robot you can watch and drive from a phone, with a safety auto-stop",
-}
 NA = "n/a"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-# ---- palette: lifted from ctop's own theme (ctop/app.py) so the two feel related
-BG = "#0c0e12"       # ctop screen background
-EDGE = "#1c2330"
-FG = "#d0d4da"       # ctop body text
-DIM = "#7d8590"      # ctop subtitle/dim
-ACCENT = "#4ea1ff"   # ctop detail-box accent (the one echoed on the profile)
-GREEN, AMBER, ROSE, BLUE = "#5fa86b", "#d9a441", "#c0627a", "#4f8fd6"
-CYAN, VIOLET, INK = "#39c5cf", "#a07cc9", "#232a36"
-SWATCH = [INK, ROSE, GREEN, AMBER, BLUE, VIOLET, CYAN, FG]
-MONO = "ui-monospace, SFMono-Regular, 'DejaVu Sans Mono', Menlo, Consolas, monospace"
-
-LANG_COLORS = {  # GitHub linguist colours, muted slightly by the card background
-    "Python": "#3572A5", "JavaScript": "#f1e05a", "TypeScript": "#3178c6",
-    "HTML": "#e34c26", "CSS": "#663399", "Shell": "#89e051", "C": "#555555",
-    "C++": "#f34b7d", "Go": "#00ADD8", "Rust": "#dea584", "Java": "#b07219",
-    "Dockerfile": "#384d54", "Makefile": "#427819", "Lua": "#000080",
+# Display order; anything else public follows, newest push first. Forks go last.
+ORDER = ["ctop-tui", "formhand", "pi-robot-cam", "jobbot", USER, "spiff-arena"]
+# Only used with --assume-published (repos that are private right now).
+PENDING = {
+    "pi-robot-cam": "Raspberry Pi robot you can watch and drive from a phone",
+    "jobbot": "Local job-application driver for Firefox, built on Formhand",
+    USER: "Profile README",
 }
+
+# ---- Windows 95 palette (system colours) and fonts
+FACE, DK, MID, LT, NAVY, TEAL = "#c0c0c0", "#000000", "#808080", "#ffffff", "#000080", "#008080"
+UI = "Tahoma, 'MS Sans Serif', Verdana, 'DejaVu Sans', sans-serif"
+MONO = "'Lucida Console', 'Courier New', 'DejaVu Sans Mono', ui-monospace, monospace"
+HEAT = ["#e4e4e4", "#99cccc", "#4da6a6", "#008080", "#004848"]  # empty .. busiest
 
 
 # ------------------------------------------------------------------ API layer
@@ -76,13 +71,12 @@ TOKEN = token()
 
 def api(path, body=None):
     """GET (or GraphQL POST when body given). Returns parsed JSON or None."""
-    url = "https://api.github.com" + path
     headers = {"Accept": "application/vnd.github+json", "User-Agent": "nb-profile-dashboard"}
     if TOKEN:
         headers["Authorization"] = "Bearer " + TOKEN
     data = json.dumps(body).encode() if body is not None else None
     try:
-        req = urllib.request.Request(url, data=data, headers=headers)
+        req = urllib.request.Request("https://api.github.com" + path, data=data, headers=headers)
         with urllib.request.urlopen(req, timeout=20) as r:
             return json.load(r)
     except Exception as e:
@@ -90,142 +84,93 @@ def api(path, body=None):
         return None
 
 
-def safe(fn, default=NA):
-    try:
-        v = fn()
-        return default if v in (None, "") else v
-    except Exception as e:
-        print(f"warn: {fn.__name__ if hasattr(fn, '__name__') else 'field'}: {e}", file=sys.stderr)
-        return default
-
-
 def parse_ts(s):
     return dt.datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=dt.timezone.utc)
 
 
-def collect():
+def short(s, n=46):
+    """One-line description: cut at the first natural clause, else at a word."""
+    s = " ".join(str(s).split())
+    best = s
+    for sep in (":", ". ", ", ", " that ", " you ", " for ", " with "):
+        if sep in s:
+            head = s.split(sep)[0]
+            if 12 <= len(head) < len(best):
+                best = head
+    s = best
+    if len(s) > n:
+        s = s[: n - 1]
+        s = s[: s.rindex(" ")] if " " in s else s
+        s = s.rstrip(" ,.;-") + "\u2026"
+    return s.rstrip(".")
+
+
+def collect(assume_published=False):
     d = {}
-    repos = api(f"/users/{USER}/repos?per_page=100&type=owner") or []
-    own = [r for r in repos if not r.get("fork") and r["name"].lower() != USER.lower()]
-    forks = sum(1 for r in repos if r.get("fork"))
-    d["repos"] = safe(lambda: (f"{len(repos)} public" + (f" \u00b7 {forks} fork" + ("s" if forks != 1 else "") if forks else "")) if repos else None)
-    d["nrepos"] = len(repos) if repos else NA
-
-    def langs():
-        tot = {}
-        for r in own:
-            for k, v in (api(f"/repos/{USER}/{r['name']}/languages") or {}).items():
-                tot[k] = tot.get(k, 0) + v
-        s = sum(tot.values())
-        return [(k, v / s) for k, v in sorted(tot.items(), key=lambda kv: -kv[1])] if s else None
-    d["langs"] = safe(langs)
-
     now = dt.datetime.now(dt.timezone.utc)
-    year = now.year
+    d["now"] = now
+    repos = {r["name"]: r for r in (api(f"/users/{USER}/repos?per_page=100&type=owner") or [])}
+    rows = []
+    for n in list(ORDER) + sorted((k for k in repos if k not in ORDER), key=lambda k: repos[k]["pushed_at"], reverse=True):
+        r = repos.get(n)
+        if r is None and not (assume_published and n in PENDING):
+            continue
+        r = r or {}
+        rows.append(dict(
+            name=n, desc=short(r.get("description") or PENDING.get(n) or NA),
+            pushed=(r.get("pushed_at") or now.strftime("%Y-%m-%d"))[:10],
+            stars=r.get("stargazers_count", 0), fork=bool(r.get("fork"))))
+    rows.sort(key=lambda x: x["fork"])  # stable: forks last, ORDER kept
+    d["rows"] = rows
+    d["nrepos"] = len(rows) if rows else NA
+    d["forks"] = sum(1 for x in rows if x["fork"])
 
-    # Total activity, honestly: GraphQL contributionsCollection counts public commits
-    # plus private ones (restrictedContributionsCount) when the owner has enabled
-    # "include private contributions" on their profile. Public-repo commit lists
-    # are only the fallback if GraphQL is unavailable (e.g. no token).
-    cc = None
-    g = api("/graphql", {"query": """query($u:String!,$f:DateTime!){user(login:$u){
-        contributionsCollection(from:$f){totalCommitContributions restrictedContributionsCount
-        contributionCalendar{weeks{contributionDays{date contributionCount}}}}}}""",
-                         "variables": {"u": USER, "f": f"{year}-01-01T00:00:00Z"}})
+    # Rolling 365 days (not calendar year). Totals include private contributions
+    # when the owner enabled "include private contributions" on their profile.
+    d["contrib"], d["active"], d["age"], d["weeks"] = NA, NA, NA, []
+    q = api("/graphql", {"query": """query($u:String!,$f:DateTime!,$t:DateTime!){user(login:$u){createdAt
+        contributionsCollection(from:$f,to:$t){contributionCalendar{totalContributions
+        weeks{contributionDays{date weekday contributionCount}}}}}}""",
+        "variables": {"u": USER, "f": (now - dt.timedelta(days=365)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                      "t": now.strftime("%Y-%m-%dT%H:%M:%SZ")}})
     try:
-        cc = g["data"]["user"]["contributionsCollection"]
-    except Exception:
-        pass
-    d["commits"] = safe(lambda: f"{cc['totalCommitContributions'] + cc['restrictedContributionsCount']} in {year}")
-
-    def active():
-        days = [x for w in cc["contributionCalendar"]["weeks"] for x in w["contributionDays"]]
-        n = sum(1 for x in days if x["contributionCount"] > 0)
-        return f"{n} days in {year}"
-    d["active"] = safe(active)
-
-    if cc is None:  # fallback: public commit lists
-        dates, ok = [], bool(own)
-        for r in own:
-            for page in range(1, 6):
-                cs = api(f"/repos/{USER}/{r['name']}/commits?per_page=100&page={page}&since={year}-01-01T00:00:00Z")
-                if cs is None:
-                    ok = False
-                    break
-                dates += [c["commit"]["author"]["date"][:10] for c in cs]
-                if len(cs) < 100:
-                    break
-        if ok:
-            d["commits"] = f"{len(dates)} in {year}"
-            n = len(set(dates))
-            d["active"] = f"{n} days in {year}"
-
-    prof = api(f"/users/{USER}") or {}
-    d["uptime_days"] = safe(lambda: (now - parse_ts(prof["created_at"])).days)
-
-    firsts = sorted(r["created_at"] for r in own)
-    d["since"] = safe(lambda: firsts[0][:4])
-
-    cnt = [0]
-
-    def release():
-        best = None
-        for r in own:
-            rel = api(f"/repos/{USER}/{r['name']}/releases/latest")
-            if rel and rel.get("tag_name"):
-                cnt[0] += 1
-                t = rel.get("published_at") or rel.get("created_at")
-                if best is None or t > best[0]:
-                    best = (t, f"{r['name']}@{rel['tag_name']}")
-        return best[1] if best else None
-    d["release"] = safe(release)
-    d["relcount"] = f"{cnt[0]} tagged" if d["release"] != NA else NA
-
-    def topics():
-        c = {}
-        for r in own:
-            for t in r.get("topics") or []:
-                c[t] = c.get(t, 0) + 1
-        top = []
-        for t in sorted(c, key=lambda t: (-c[t], t))[:4]:  # up to 4, as many as fit the card
-            if len(" \u00b7 ".join(top + [t])) <= 40:
-                top.append(t)
-        return " \u00b7 ".join(top) if top else None
-    d["topics"] = safe(topics)
-
-    by = {r["name"]: r for r in repos}
-    d["featured"] = []
-    for n in FEATURED:
-        desc = (by.get(n) or {}).get("description") or FALLBACK_DESC.get(n) or NA
-        d["featured"].append((n, desc))
+        u = q["data"]["user"]
+        cal = u["contributionsCollection"]["contributionCalendar"]
+        d["weeks"] = [w["contributionDays"] for w in cal["weeks"]]
+        d["contrib"] = cal["totalContributions"]
+        d["active"] = sum(1 for w in d["weeks"] for x in w if x["contributionCount"] > 0)
+        mo = (now - parse_ts(u["createdAt"])).days // 30
+        d["age"] = f"{mo} months" if mo < 24 else f"{mo // 12} years"
+    except Exception as e:
+        print(f"warn: contributions: {e}", file=sys.stderr)
 
     def last_commit():
-        ev = api(f"/users/{USER}/events/public?per_page=50") or []
-        for e in ev:
+        for e in api(f"/users/{USER}/events/public?per_page=50") or []:
             if e.get("type") != "PushEvent":
                 continue
             repo = e["repo"]["name"]
             msgs = [c["message"] for c in e.get("payload", {}).get("commits", []) if c.get("message")]
             when = e["created_at"]
-            if not msgs:  # GitHub often omits commits[] from events; ask the repo
+            if not msgs:  # events often omit commits[]; ask the repo
                 cs = api(f"/repos/{repo}/commits?per_page=1")
                 if cs:
                     msgs = [cs[0]["commit"]["message"]]
                     when = cs[0]["commit"]["author"]["date"]
             if msgs:
-                return (when[:10] + " " + when[11:16], repo.split("/")[-1], msgs[-1].splitlines()[0])
-        return None
-    d["last"] = safe(last_commit)
-    d["updated"] = now.strftime("%Y-%m-%d")
+                return (when[:10], repo.split("/")[-1], msgs[-1].splitlines()[0])
+    try:
+        d["last"] = last_commit() or NA
+    except Exception as e:
+        print(f"warn: last commit: {e}", file=sys.stderr)
+        d["last"] = NA
     return d
 
 
-# ------------------------------------------------------------------ helpers
+# ------------------------------------------------------------------ svg helpers
 def clean(s):
-    """XML-safe text: drop control chars and non-BMP (emoji) then escape."""
+    """XML-safe text: drop control chars and non-BMP (emoji), then escape."""
     s = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", str(s))
-    s = "".join(c for c in s if ord(c) < 0x10000)
-    return escape(s)
+    return escape("".join(c for c in s if ord(c) < 0x10000))
 
 
 def trunc(s, n):
@@ -233,314 +178,304 @@ def trunc(s, n):
     if len(s) <= n:
         return s
     cut = s[: n - 1]
-    if " " in cut and s[n - 1] != " ":  # prefer a word boundary over a mid-word cut
+    if " " in cut and s[n - 1] != " ":
         cut = cut[: cut.rindex(" ")]
     return cut.rstrip(" ,.:;-") + "\u2026"
 
 
-def xs(x0, text, cw):
-    return " ".join(f"{x0 + i * cw:.2f}" for i in range(len(text)))
+def bevel(o, x, y, w, h, raised=True, fill=FACE):
+    """Win95 two-pixel bevel. Raised = buttons/panels; sunken = fields."""
+    a, b = (LT, DK) if raised else (DK, LT)
+    a2, b2 = (FACE, MID) if raised else (MID, FACE)
+    cs = 'fill="none" shape-rendering="crispEdges"'
+    if fill:
+        o.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" fill="{fill}"/>')
+    o.append(f'<path d="M{x + .5} {y + h}V{y + .5}H{x + w}" stroke="{a}" {cs}/>')
+    o.append(f'<path d="M{x + w - .5} {y}V{y + h - .5}H{x}" stroke="{b}" {cs}/>')
+    o.append(f'<path d="M{x + 1.5} {y + h - 1}V{y + 1.5}H{x + w - 1}" stroke="{a2}" {cs}/>')
+    o.append(f'<path d="M{x + w - 1.5} {y + 1}V{y + h - 1.5}H{x + 1}" stroke="{b2}" {cs}/>')
 
 
-def gtext(x0, y, text, cw, cls="", fill=None):
-    """One <text> with an explicit x per glyph (font-independent columns)."""
-    f = f' fill="{fill}"' if fill else ""
-    c = f' class="{cls}"' if cls else ""
-    return f'<text x="{xs(x0, text, cw)}" y="{y}"{c}{f} xml:space="preserve">{clean(text)}</text>'
+def chrome(o, W, H, title):
+    """Window frame, navy title bar, three caption buttons. 1px black outline so the
+    grey face never bleeds into a light page background."""
+    o.append(f'<rect width="{W}" height="{H}" fill="{FACE}"/>')
+    bevel(o, 0, 0, W, H)
+    o.append(f'<rect x="4" y="4" width="{W - 8}" height="20" fill="{NAVY}"/>')
+    o.append(f'<text x="9" y="18" fill="{LT}" font-weight="bold" class="ui">{clean(title)}</text>')
+    for i, kind in enumerate(("min", "max", "x")):
+        x = W - 6 - (3 - i) * 18 - (2 if i == 2 else 0)
+        bevel(o, x, 6, 16, 14)
+        if kind == "min":
+            o.append(f'<rect x="{x + 4}" y="15" width="7" height="2" fill="{DK}"/>')
+        elif kind == "max":
+            o.append(f'<rect x="{x + 3.5}" y="8.5" width="9" height="7" fill="none" stroke="{DK}"/>'
+                     f'<rect x="{x + 3}" y="8" width="10" height="2" fill="{DK}"/>')
+        else:
+            o.append(f'<path d="M{x + 4} 8.5L{x + 12} 16.5M{x + 12} 8.5L{x + 4} 16.5" stroke="{DK}" stroke-width="2"/>')
+    o.append(f'<rect x=".5" y=".5" width="{W - 1}" height="{H - 1}" fill="none" stroke="{DK}"/>')
 
 
-def card(w, h, body, extra_css="", title="", desc=""):
-    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" role="img" aria-labelledby="t d">
-<title id="t">{clean(title)}</title><desc id="d">{clean(desc)}</desc>
-<style>
-text{{font-family:{MONO};font-size:14px;fill:{FG}}}
-.dim{{fill:{DIM}}} .k{{fill:{ACCENT};font-weight:bold}} .g{{fill:{GREEN}}} .a{{fill:{AMBER}}}
-{extra_css}
-</style>
-<rect x="0.5" y="0.5" width="{w - 1}" height="{h - 1}" rx="12" fill="{BG}" stroke="{EDGE}"/>
-{body}
-</svg>
-'''
+def wrap(W, H, body, css, title, desc):
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img" aria-labelledby="t d">\n'
+            f'<title id="t">{clean(title)}</title><desc id="d">{clean(desc)}</desc>\n<style>{css}</style>\n{body}\n</svg>\n')
 
 
-# ------------------------------------------------------------------ fetch.svg
-# 12-col glyphs, 3-col vertical strokes, ~1-row horizontal strokes, chamfered corners.
-N = ["", "",
-     "███" + "▄" * 8,
-     "███" + "▀" * 6 + "███",
-     "███      ███", "███      ███", "███      ███", "███      ███", "███      ███", "███      ███"]
-B = ["███", "███",
-     "███" + "▄" * 8,
-     "███" + "▀" * 6 + "███",
-     "███      ███", "███      ███", "███      ███", "███      ███", "███      ███",
-     "███████████▀"]
-LOGO = [a.ljust(14) + b.ljust(12) for a, b in zip(N, B)]
-# top-to-bottom accent ramp, same hue family as ctop's blues
-RAMP = ["#8cc4ff", "#7bb9ff", "#6aaeff", "#5ea6ff", "#4ea1ff", "#4a9af2", "#4a92e6", "#4f8fd6", "#4f8fd6", "#4a84c4"]
+UI_CSS = f".ui{{font-family:{UI};font-size:13px}}.sm{{font-family:{UI};font-size:11px}}.num{{font-variant-numeric:tabular-nums}}"
 
 
-def fetch_svg(d):
-    W, H = 860, 392
-    cw = 9.6
-    lx = 26
-    ix, iw = 340, 8.4
-    row = 23
-    top = 62
-    out = []
-    # The logo is drawn as pixel runs rather than font glyphs: block characters
-    # (█ ▄ ▀) fall back to different fonts on different systems and leave seams
-    # between rows. Rects are identical everywhere. A soft offset shadow gives the
-    # "ANSI Shadow" feel. Source text lives in LOGO so the art stays editable.
-    cwp, rh = 11, 9  # px per column, px per half-row
-    ly = top - 14 + (9 * row - len(LOGO) * 2 * rh) // 2 + 4
-    def runs(i, line):
-        j = 0
-        while j < len(line):
-            c = line[j]
-            if c == " ":
-                j += 1
-                continue
-            k = j
-            while k < len(line) and line[k] == c:
-                k += 1
-            y0 = ly + i * 2 * rh + (rh if c == "\u2584" else 0)
-            h = rh if c in "\u2584\u2580" else 2 * rh
-            yield lx + j * cwp, y0, (k - j) * cwp, h
-            j = k
-    shadow, front = [], []
-    for i, line in enumerate(LOGO):
-        for x, y0, w, h in runs(i, line):
-            shadow.append(f'<rect x="{x + 3}" y="{y0 + 3}" width="{w}" height="{h}"/>')
-            front.append(f'<rect x="{x}" y="{y0}" width="{w}" height="{h}" fill="{RAMP[i]}"/>')
-    out.append(f'<g fill="{INK}" shape-rendering="crispEdges">' + "".join(shadow) + "</g>")
-    out.append('<g shape-rendering="crispEdges">' + "".join(front) + "</g>")
+# ------------------------------------------------------------------ window.svg
+def level(n, mx):
+    if n <= 0:
+        return 0
+    return min(4, 1 + int(3.999 * (n - 1) / max(mx - 1, 1) * 0.999)) if mx > 1 else 2
 
-    y = top
-    out.append(gtext(ix, y, f"{HANDLE}@github", iw, "k"))
-    out.append(f'<text x="{ix}" y="{y}" dx="{len(HANDLE + "@github") * iw + 12:.1f}" class="dim">{clean(DISPLAY)}</text>')
-    out.append(f'<text x="{ix + 440}" y="{y}" text-anchor="end" class="dim" style="font-size:12px">@{USER}</text>')
-    y += 10
-    out.append(f'<rect x="{ix}" y="{y}" width="440" height="1" fill="{EDGE}"/>')
-    y += row - 4
 
-    langs = d["langs"] if isinstance(d["langs"], list) else None
-    lang_txt = "  ".join(f"{k} {v * 100:.0f}%" for k, v in langs[:3]) if langs else NA
-    rows = [
-        ("repos", d["repos"]),
-        ("langs", lang_txt),
-        ("commits", d["commits"]),
-        ("active", d["active"]),
-        ("release", d["release"] if d["release"] == NA else f"{d['release']} \u00b7 {d['relcount']}"),
-        ("topics", d["topics"]),
-        ("featured", " · ".join(FEATURED)),
-        ("updated", f"{d['updated']} by action"),
-    ]
-    vx = ix + 10 * iw
-    for k, v in rows:
-        out.append(gtext(ix, y, k, iw, "k"))
-        out.append(gtext(vx, y, trunc(v, 54), iw, "na dim" if v == NA else ""))
-        y += row
-    # classic fastfetch language strip (proportional, rounded ends)
-    y += 2
-    bw = 440
-    out.append(f'<clipPath id="bar"><rect x="{ix}" y="{y}" width="{bw}" height="12" rx="6"/></clipPath><g clip-path="url(#bar)">')
-    if langs:
-        x = float(ix)
-        shown = [(k, v) for k, v in langs if v >= 0.01]
-        tot = sum(v for _, v in shown)
-        for k, v in shown:
-            w = bw * v / tot
-            out.append(f'<rect x="{x:.1f}" y="{y}" width="{w + 0.6:.1f}" height="12" fill="{LANG_COLORS.get(k, DIM)}"/>')
-            x += w
+def heatmap(o, weeks, x0, y0, pitch=14, cell=11, ramp=HEAT):
+    """GitHub-style grid, one column per week, rows Sun..Sat; Mon/Wed/Fri labels."""
+    o.append(f'<text x="{x0 - 8}" y="{y0 + 1 * pitch + 9}" text-anchor="end" fill="{DK}" class="sm">Mon</text>')
+    o.append(f'<text x="{x0 - 8}" y="{y0 + 3 * pitch + 9}" text-anchor="end" fill="{DK}" class="sm">Wed</text>')
+    o.append(f'<text x="{x0 - 8}" y="{y0 + 5 * pitch + 9}" text-anchor="end" fill="{DK}" class="sm">Fri</text>')
+    counts = [x["contributionCount"] for w in weeks for x in w]
+    mx = max(counts) if counts else 0
+    nz = sorted(c for c in counts if c > 0)
+    # quartile thresholds over non-empty days, as GitHub does, so one huge day
+    # does not flatten everything else
+    cuts = [nz[int(len(nz) * f)] for f in (0.25, 0.5, 0.75)] if nz else [1, 2, 3]
+    def lv(c):
+        return 0 if c <= 0 else 1 + sum(c > t for t in cuts)
+    last_label = -10
+    for i, w in enumerate(weeks):
+        first = dt.date.fromisoformat(w[0]["date"])
+        if (i == 0 or first.day <= 7) and i - last_label >= 3 and (i > 0 or first.day <= 14):
+            o.append(f'<text x="{x0 + i * pitch}" y="{y0 - 5}" fill="{DK}" class="sm">{first.strftime("%b")}</text>')
+            last_label = i
+        for x in w:
+            r = x["weekday"]
+            c = x["contributionCount"]
+            o.append(f'<rect x="{x0 + i * pitch}" y="{y0 + r * pitch}" width="{cell}" height="{cell}" fill="{ramp[lv(c)]}"/>')
+
+
+def window_svg(d, ramp=HEAT):
+    W = 860
+    rows = d["rows"]
+    rowh = 20
+    o = []
+    chrome(o, W, 10, "nb@github - Properties")  # placeholder height, replaced below
+    o.clear()
+    listy = 72
+    list_h = 22 + rowh * max(len(rows), 1) + 6
+    act_y = listy + list_h + 16
+    panel_y = act_y + 6
+    panel_h = 154
+    H = panel_y + panel_h + 14 + 28
+    chrome(o, W, H, "nb@github - Properties")
+    mx = 12
+    for m in ("File", "Edit", "View", "Help"):
+        o.append(f'<text x="{mx}" y="44" fill="{DK}" class="ui">{m}</text>')
+        mx += 26 + len(m) * 7
+    o.append(f'<text x="14" y="{listy - 6}" fill="{DK}" class="ui">Public repositories of @{USER}:</text>')
+    lw = W - 28
+    bevel(o, 14, listy, lw, list_h, raised=False, fill=LT)
+    cols = [(18, 140, "Name"), (158, 424, "Description"), (582, 110, "Pushed"), (692, 60, "Stars"), (752, lw - 752 + 10, "")]
+    for x, w, t in cols:
+        bevel(o, x, listy + 3, w, 20)
+        o.append(f'<text x="{x + 6}" y="{listy + 17}" fill="{DK}" class="ui">{t}</text>')
+    y = listy + 24
+    for i, r in enumerate(rows):
+        sel = i == 0
+        if sel:
+            o.append(f'<rect x="18" y="{y}" width="{lw - 8}" height="{rowh}" fill="{NAVY}"/>'
+                     f'<rect x="18.5" y="{y + .5}" width="{lw - 9}" height="{rowh - 1}" fill="none" stroke="{LT}" stroke-dasharray="1 1"/>')
+        col = LT if sel else DK
+        ty = y + 14
+        nm = clean(r["name"]) + (" (fork)" if r["fork"] else "")
+        o.append(f'<text x="24" y="{ty}" fill="{col}" class="ui">{nm}</text>')
+        o.append(f'<text x="164" y="{ty}" fill="{col}" class="ui">{clean(r["desc"])}</text>')
+        o.append(f'<text x="588" y="{ty}" fill="{col}" class="ui num">{r["pushed"]}</text>')
+        if r["stars"]:
+            o.append(f'<text x="698" y="{ty}" fill="{col}" class="ui num">{r["stars"]}</text>')
+        y += rowh
+    o.append(f'<text x="14" y="{act_y}" fill="{DK}" class="ui">Activity:</text>')
+    bevel(o, 14, panel_y, lw, panel_h, raised=False, fill=LT)
+    weeks = d["weeks"]
+    if weeks:
+        heatmap(o, weeks, 58, panel_y + 28, ramp=ramp)
+        # legend, bottom right of the panel
+        lx = 14 + lw - 8 - (34 + 5 * 15 + 34)
+        ly = panel_y + panel_h - 22
+        o.append(f'<text x="{lx}" y="{ly + 10}" fill="{DK}" class="sm">Less</text>')
+        for i, c in enumerate(ramp):
+            o.append(f'<rect x="{lx + 30 + i * 15}" y="{ly}" width="11" height="11" fill="{c}"/>')
+        o.append(f'<text x="{lx + 30 + 5 * 15 + 3}" y="{ly + 10}" fill="{DK}" class="sm">More</text>')
     else:
-        out.append(f'<rect x="{ix}" y="{y}" width="{bw}" height="12" fill="{INK}"/>')
-    out.append("</g>")
-    # signature fastfetch swatch row
-    y += 26
-    for i, c in enumerate(SWATCH):
-        out.append(f'<rect x="{ix + i * 34}" y="{y}" width="30" height="16" rx="3" fill="{c}"/>')
-    css = ""
-    return card(W, H, "\n".join(out), css, f"{HANDLE}@github",
-                f"GitHub activity summary for {USER}, rendered as a system-info card.")
+        o.append(f'<text x="24" y="{panel_y + 30}" fill="{MID}" class="ui">n/a</text>')
+    # status bar
+    sy = H - 26
+    cells = [(f"{d['contrib']} contributions, last 365 days", 290), (f"{d['active']} active days", 150),
+             (f"{d['nrepos']} repos" + (f" ({d['forks']} fork)" if d["forks"] else ""), 150), (f"account age {d['age']}", 0)]
+    x = 8
+    for t, w in cells:
+        w = w or (W - 8 - x)
+        bevel(o, x, sy, w, 20, raised=False, fill=None)
+        o.append(f'<text x="{x + 6}" y="{sy + 14}" fill="{DK}" class="ui">{clean(t)}</text>')
+        x += w + 2
+    return wrap(W, H, "\n".join(o), UI_CSS, "nb@github - Properties",
+                f"Public repositories of {USER} with a contribution heatmap for the last 365 days.")
 
 
 # ------------------------------------------------------------------ terminal.svg
-CW, LH, TX, T0 = 8.4, 24, 28, 58
-CYCLE = 20.0
-RESET_AT = 19.4
+CW, LH, TX = 8.4, 19, 24
+CYCLE, RESET_AT = 20.0, 19.4
+PROMPT = "C:\\GITHUB>"
+PX = TX + len(PROMPT) * CW
+TOP = 52  # first text baseline
+GREY, WHITE = "#c0c0c0", "#ffffff"
+
+
+def xs(x0, text):
+    return " ".join(f"{x0 + i * CW:.2f}" for i in range(len(text)))
 
 
 def build_script(d):
-    """Return list of ('type', line, text, start, [char times]) / ('out', line, [(text,cls,dx)], t)."""
-    rnd = random.Random(7)  # fixed seed -> stable diffs between runs
+    rnd = random.Random(7)  # fixed seed -> stable diffs
 
     def cadence(t, text):
-        times = []
+        out = []
         for ch in text:
-            t += rnd.uniform(0.055, 0.12) + (0.09 if ch in " /-." and rnd.random() < .5 else 0)
-            times.append(round(t, 3))
-        return times
-    ev = []
-    t = 0.7
-    cmds = [
-        ("ls projects/", 0),
-        ("uptime", 0),
-        ("tail -1 activity.log", 0),
-    ]
-    line = 0
-    # 1) ls projects/
-    ev.append(("type", line, cmds[0][0], cadence(t, cmds[0][0])))
-    t = ev[-1][3][-1] + 0.45
-    line += 1
-    nm = max(len(n) for n, _ in d["featured"]) + 3
-    for n, desc in d["featured"]:
-        avail = 90 - nm - 1
-        ws = textwrap.wrap(desc, avail) or [desc]
-        if len(ws) > 2:  # keep it to two lines; ellipsis only if still too long
-            ws = [ws[0], trunc(" ".join(ws[1:]), avail)]
-        for k, w in enumerate(ws):
-            parts = [(n + "/", "k", 0)] if k == 0 else []
-            ev.append(("out", line, parts + [(w, "dim", nm)], round(t, 3)))
-            line += 1
-        t += 0.28
-    # 2) uptime
-    t += 1.0
-    ev.append(("type", line, cmds[1][0], cadence(t, cmds[1][0])))
-    t = ev[-1][3][-1] + 0.4
-    line += 1
-    days = d["uptime_days"]
-    up = f"up {days} day{'s' if days != 1 else ''} since first commit, {d['nrepos']} public repos" if days != NA else f"up {NA} since first commit, {d['nrepos']} public repos"
-    ev.append(("out", line, [(up, "", 0)], round(t, 3)))
-    line += 1
-    # 3) tail -1 activity.log
+            t += rnd.uniform(0.055, 0.12) + (0.09 if ch in " ." and rnd.random() < .5 else 0)
+            out.append(round(t, 3))
+        return out
+    ev, line, t = [], 0, 0.7
+
+    def cmd(text):
+        nonlocal line, t
+        ts = cadence(t, text)
+        ev.append(("type", line, text, ts))
+        t = ts[-1] + 0.4
+        line += 1
+
+    def out(text, tt, color=GREY):
+        nonlocal line
+        ev.append(("out", line, text, round(tt, 3), color))
+        line += 1
+    cmd("dir")
+    out(" Directory of C:\\GITHUB", t); t += 0.15
+    out("", t); t += 0.0
+    for r in d["rows"]:
+        tag = "<DIR>" if not r["fork"] else "<DIR> fork"
+        out(f"{r['name']:<16}{tag:<12}{r['pushed']}", t); t += 0.14
+    out(f"{len(d['rows']):>8} dir(s)", t)
+    t += 1.3
+    cmd("type stats.txt")
+    stats = [("contributions", f"{d['contrib']}  (last 365 days)"), ("active days", str(d["active"])),
+             ("repos", f"{d['nrepos']}" + (f"  ({d['forks']} fork)" if d["forks"] else "")), ("account age", str(d["age"]))]
+    for k, v in stats:
+        out(f"{k:<16}{v}", t); t += 0.14
     t += 1.2
-    ev.append(("type", line, cmds[2][0], cadence(t, cmds[2][0])))
-    t = ev[-1][3][-1] + 0.5
-    line += 1
+    cmd("type last.log")
     if isinstance(d["last"], tuple):
         when, repo, msg = d["last"]
-        parts = [(when, "dim", 0), (repo, "k", 17), (trunc(msg, 90 - 17 - len(repo) - 2), "", 17 + len(repo) + 2)]
+        out(trunc(f"{when}  {repo}  {msg}", 92), t)
     else:
-        parts = [(NA, "dim", 0)]
-    ev.append(("out", line, parts, round(t, 3)))
-    line += 1
+        out(NA, t)
     t += 0.9
-    ev.append(("prompt", line, "", round(t, 3)))  # idle prompt with blinking cursor
+    ev.append(("prompt", line, "", round(t, 3)))
     return ev, line
 
 
-PROMPT = "nb@github"
-PROMPT_TAIL = ":~$ "
-PX = TX + (len(PROMPT) + len(PROMPT_TAIL)) * CW
-
-
-def prompt_markup(y, vis=None):
-    a = vis or ""
-    return (f'<g {a}><text x="{xs(TX, PROMPT, CW)}" y="{y}" class="g">{PROMPT}</text>'
-            f'<text x="{xs(TX + len(PROMPT) * CW, PROMPT_TAIL.strip(), CW)}" y="{y}" class="dim">{PROMPT_TAIL.strip()}</text></g>')
-
-
 def vis_anim(t_on, t_off=RESET_AT):
-    """Hidden -> visible at t_on -> hidden at reset; loops with the document."""
-    a, b = t_on / CYCLE, t_off / CYCLE
     return (f'<animate attributeName="visibility" calcMode="discrete" dur="{CYCLE:g}s" repeatCount="indefinite" '
-            f'values="hidden;visible;hidden;hidden" keyTimes="0;{a:.4f};{b:.4f};1"/>')
+            f'values="hidden;visible;hidden;hidden" keyTimes="0;{t_on / CYCLE:.4f};{t_off / CYCLE:.4f};1"/>')
 
 
-def terminal_svg(d, mode="anim", at=None):
-    """mode: anim (SMIL) | static (final frame) | frame (snapshot at `at` seconds)."""
-    ev, last_line = build_script(d)
-    W = 860
-    H = T0 + (last_line + 1) * LH + 22
-    out = []
-    # window chrome: three muted dots + path title, no branding
-    out.append(f'<circle cx="26" cy="22" r="5" fill="{ROSE}" opacity=".7"/><circle cx="44" cy="22" r="5" fill="{AMBER}" opacity=".7"/>'
-               f'<circle cx="62" cy="22" r="5" fill="{GREEN}" opacity=".7"/>')
-    out.append(f'<text x="{W / 2 - 60:.0f}" y="26" class="dim" style="font-size:12px">nb@github: ~</text>')
-    out.append(f'<rect x="1" y="38" width="{W - 2}" height="1" fill="{EDGE}"/>')
+def terminal_body(d, mode="anim", at=None):
+    """Session lines on the black screen. mode: anim (SMIL) | static | frame (snapshot at `at`)."""
+    ev, last = build_script(d)
+    o = []
 
     def show(t_on):
-        """Return (attr, child) visibility pieces for an element appearing at t_on."""
         if mode == "anim":
             return ' visibility="hidden"', vis_anim(t_on)
         if mode == "static" or (at is not None and t_on <= at):
             return "", ""
         return ' visibility="hidden"', ""
 
+    def prompt(y):
+        return f'<text x="{xs(TX, PROMPT)}" y="{y}" fill="{GREY}">{clean(PROMPT)}</text>'
     for e in ev:
         kind, ln = e[0], e[1]
-        y = T0 + ln * LH
-        if kind in ("type", "out"):
-            pass
+        y = TOP + ln * LH
         if kind == "type":
             text, times = e[2], e[3]
             attr, child = show(times[0] - 0.12)
-            out.append(f'<g{attr}>{child}<text x="{xs(TX, PROMPT, CW)}" y="{y}" class="g">{PROMPT}</text>'
-                       f'<text x="{xs(TX + len(PROMPT) * CW, PROMPT_TAIL.strip(), CW)}" y="{y}" class="dim">{PROMPT_TAIL.strip()}</text></g>')
+            o.append(f'<g{attr}>{child}{prompt(y)}</g>')
             for i, (ch, tt) in enumerate(zip(text, times)):
-                if ch == " ":
-                    continue
-                attr, child = show(tt)
-                out.append(f'<text x="{PX + i * CW:.2f}" y="{y}"{attr}>{child}{clean(ch)}</text>')
-            # cursor block follows the last typed char, then disappears when the output lands
+                if ch != " ":
+                    attr, child = show(tt)
+                    o.append(f'<text x="{PX + i * CW:.2f}" y="{y}" fill="{WHITE}"{attr}>{child}{clean(ch)}</text>')
             nxt = next(x for x in ev if x[1] == ln + 1)
             t_end = nxt[3] if nxt[0] != "type" else nxt[3][0] - 0.12
             if mode == "anim":
-                xv = ";".join(f"{PX + i * CW:.2f}" for i in range(len(text) + 1))
-                kt = ";".join(f"{(t0 / CYCLE):.4f}" for t0 in [times[0] - 0.12] + times)
-                # appear at first key, step along the text, hide after output lands
-                vals = f"{PX:.2f};" + ";".join(f"{PX + (i + 1) * CW:.2f}" for i in range(len(text)))
-                out.append(f'<rect y="{y - 12}" width="{CW:.2f}" height="16" fill="{ACCENT}" opacity=".85" visibility="hidden" x="{PX:.2f}">'
-                           f'<animate attributeName="x" calcMode="discrete" dur="{CYCLE:g}s" repeatCount="indefinite" values="{PX:.2f};{vals}" keyTimes="0;{kt}"/>'
-                           f'{vis_anim(times[0] - 0.12, t_end)}</rect>')
+                kt = ";".join(f"{(v / CYCLE):.4f}" for v in [times[0] - 0.12] + times)
+                vals = f"{PX:.2f};{PX:.2f};" + ";".join(f"{PX + (i + 1) * CW:.2f}" for i in range(len(text)))
+                o.append(f'<rect y="{y - 12}" x="{PX:.2f}" width="{CW}" height="15" fill="{GREY}" visibility="hidden">'
+                         f'<animate attributeName="x" calcMode="discrete" dur="{CYCLE:g}s" repeatCount="indefinite" values="{vals}" keyTimes="0;{kt}"/>'
+                         f'{vis_anim(times[0] - 0.12, t_end)}</rect>')
             elif mode == "frame" and at is not None and times[0] - 0.12 <= at < t_end:
                 k = sum(1 for tt in times if tt <= at)
-                out.append(f'<rect x="{PX + k * CW:.2f}" y="{y - 12}" width="{CW}" height="16" fill="{ACCENT}" opacity=".85"/>')
+                o.append(f'<rect x="{PX + k * CW:.2f}" y="{y - 12}" width="{CW}" height="15" fill="{GREY}"/>')
         elif kind == "out":
-            attr, child = show(e[3])
-            segs = "".join(
-                f'<text x="{xs(TX + dx * CW, txt, CW)}" y="{y}"{(" class=%s" % chr(34) + cls + chr(34)) if cls else ""}>{clean(txt)}</text>'
-                for txt, cls, dx in e[2])
-            out.append(f'<g{attr}>{child}{segs}</g>')
+            if e[2]:
+                attr, child = show(e[3])
+                o.append(f'<g{attr}>{child}<text x="{xs(TX, e[2])}" y="{y}" fill="{e[4]}" xml:space="preserve">{clean(e[2])}</text></g>')
         elif kind == "prompt":
             attr, child = show(e[3])
-            out.append(f'<g{attr}>{child}<text x="{xs(TX, PROMPT, CW)}" y="{y}" class="g">{PROMPT}</text>'
-                       f'<text x="{xs(TX + len(PROMPT) * CW, PROMPT_TAIL.strip(), CW)}" y="{y}" class="dim">{PROMPT_TAIL.strip()}</text>'
-                       f'<rect x="{PX:.2f}" y="{y - 12}" width="{CW}" height="16" fill="{ACCENT}" opacity=".85">'
-                       + ('<animate attributeName="opacity" dur="1.1s" repeatCount="indefinite" calcMode="discrete" values=".85;0" keyTimes="0;.5"/>' if mode == "anim" else "")
-                       + '</rect></g>')
-    body = "\n".join(out)
-    return card(W, H, body, "", f"{HANDLE}@github terminal",
-                "A looping terminal session listing projects, uptime since the first commit, and the latest commit message.")
+            blink = ('<animate attributeName="opacity" dur="1.1s" repeatCount="indefinite" calcMode="discrete" values="1;0" keyTimes="0;.5"/>'
+                     if mode == "anim" else "")
+            o.append(f'<g{attr}>{child}{prompt(y)}<rect x="{PX:.2f}" y="{y - 12}" width="{CW}" height="15" fill="{GREY}">{blink}</rect></g>')
+    return "\n".join(o), last
 
 
-def terminal_with_reduced_motion(d):
-    """Animated group by default; static final frame replaces it under prefers-reduced-motion."""
-    anim = terminal_svg(d, "anim")
-    stat = terminal_svg(d, "static")
-    grab = lambda s: s[s.index('<rect x="1" y="38"'):s.rindex("</svg>")].split("\n", 1)[1]
-    # reuse the chrome from anim; swap only the session body
-    head_end = anim.index('<rect x="1" y="38"')
-    css = ("#s{display:none}@media (prefers-reduced-motion:reduce){#a{display:none}#s{display:inline}}")
-    anim_body = anim[head_end:anim.rindex("</svg>")].split("\n", 1)[1]
-    stat_body = stat[stat.index('<rect x="1" y="38"'):stat.rindex("</svg>")].split("\n", 1)[1]
-    pre = anim[:head_end].replace("</style>", css + "\n</style>", 1)
-    return pre + anim_body.join(['<rect x="1" y="38" width="858" height="1" fill="%s"/>\n<g id="a">' % EDGE, "</g>\n"]) + \
-        '<g id="s">' + stat_body + "</g>\n</svg>\n"
+def terminal_svg(d, mode="reduced", at=None):
+    """mode 'reduced': animated group, with a static final frame shown under prefers-reduced-motion.
+    mode 'frame': one snapshot at `at` seconds (preview only)."""
+    W = 860
+    _, last = build_script(d)
+    H = TOP + (last + 1) * LH + 22 + 8
+    o = []
+    chrome(o, W, H, "MS-DOS Prompt")
+    sx, sy, sw, sh = 8, 30, W - 16, H - 38
+    bevel(o, sx, sy, sw, sh, raised=False, fill=DK)
+    body = ""
+    css = UI_CSS + f".dos text{{font-family:{MONO};font-size:14px}}"
+    screen_y = 0
+    if mode == "frame":
+        b, _ = terminal_body(d, "frame", at)
+        body = f'<g class="dos">{b}</g>'
+    else:
+        a, _ = terminal_body(d, "anim")
+        s, _ = terminal_body(d, "static")
+        css += "#s{display:none}@media (prefers-reduced-motion:reduce){#a{display:none}#s{display:inline}}"
+        body = f'<g class="dos" id="a">{a}</g><g class="dos" id="s">{s}</g>'
+    return wrap(W, H, "\n".join(o) + "\n" + body, css, "MS-DOS Prompt",
+                "A looping terminal session: directory listing of the repos, the stats, and the latest commit message.")
 
 
 def main():
-    d = collect()
-    print(json.dumps({k: v for k, v in d.items()}, indent=1, default=str), file=sys.stderr)
+    d = collect("--assume-published" in sys.argv)
+    printable = {k: v for k, v in d.items() if k not in ("weeks", "now")}
+    print(json.dumps(printable, indent=1, default=str), file=sys.stderr)
     os.makedirs(os.path.join(ROOT, "assets"), exist_ok=True)
-    for name, svg in (("fetch.svg", fetch_svg(d)), ("terminal.svg", terminal_with_reduced_motion(d))):
+    outs = {"window.svg": window_svg(d), "terminal.svg": terminal_svg(d)}
+    for name, svg in outs.items():
         with open(os.path.join(ROOT, "assets", name), "w", encoding="utf-8") as f:
             f.write(svg)
         print(f"wrote assets/{name} ({len(svg)} bytes)")
     if "--preview" in sys.argv:
         pd = sys.argv[sys.argv.index("--preview") + 1]
         os.makedirs(pd, exist_ok=True)
-        for t in (1.5, 3.0, 6.0, 9.5, 12.0):
+        for t in (1.5, 4.0, 7.5, 11.0, 14.0, 18.5):
             with open(os.path.join(pd, f"terminal-t{t:04.1f}.svg"), "w", encoding="utf-8") as f:
                 f.write(terminal_svg(d, "frame", t))
 
@@ -548,6 +483,8 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except Exception as e:  # last-resort: never fail the workflow on a render bug
+    except Exception as e:  # never fail the workflow on a render bug
+        import traceback
+        traceback.print_exc()
         print(f"error: {e}", file=sys.stderr)
         sys.exit(0)
