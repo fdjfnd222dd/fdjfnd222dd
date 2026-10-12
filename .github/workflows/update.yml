@@ -8,6 +8,11 @@ on:
     branches: [main]
 
 # Only needs to push the regenerated SVGs back to this repo.
+# One run at a time: a manual run racing the push-triggered run made the second push fail.
+concurrency:
+  group: dashboard-refresh
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -33,5 +38,6 @@ jobs:
             echo "no changes"
           else
             git commit -m "chore: refresh dashboard"
+            git pull --rebase origin main
             git push
           fi
