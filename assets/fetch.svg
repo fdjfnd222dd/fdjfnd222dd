@@ -19,27 +19,25 @@ text{font-family:ui-monospace, SFMono-Regular, 'DejaVu Sans Mono', Menlo, Consol
 <text x="340.00 348.40 356.80 365.20 373.60 382.00 390.40" y="137" class="k" xml:space="preserve">commits</text>
 <text x="424.00 432.40 440.80 449.20 457.60 466.00 474.40 482.80 491.20" y="137" xml:space="preserve">5 in 2026</text>
 <text x="340.00 348.40 356.80 365.20 373.60 382.00 390.40" y="160" class="k" xml:space="preserve">release</text>
-<text x="424.00 432.40 440.80 449.20 457.60 466.00 474.40 482.80 491.20 499.60 508.00 516.40 524.80 533.20 541.60" y="160" xml:space="preserve">formhand@v1.0.0</text>
-<text x="340.00 348.40 356.80 365.20 373.60 382.00 390.40 398.80" y="183" class="k" xml:space="preserve">releases</text>
-<text x="424.00 432.40 440.80 449.20 457.60 466.00 474.40 482.80" y="183" xml:space="preserve">1 tagged</text>
-<text x="340.00 348.40 356.80 365.20 373.60 382.00" y="206" class="k" xml:space="preserve">topics</text>
-<text x="424.00 432.40 440.80 449.20 457.60 466.00 474.40 482.80 491.20 499.60 508.00 516.40 524.80 533.20 541.60 550.00 558.40 566.80 575.20 583.60 592.00 600.40 608.80 617.20 625.60 634.00 642.40 650.80 659.20 667.60 676.00 684.40 692.80" y="206" xml:space="preserve">autofill · battery-monitor · btop</text>
-<text x="340.00 348.40 356.80 365.20 373.60 382.00 390.40 398.80" y="229" class="k" xml:space="preserve">featured</text>
-<text x="424.00 432.40 440.80 449.20 457.60 466.00 474.40 482.80 491.20 499.60 508.00 516.40 524.80 533.20 541.60 550.00 558.40 566.80 575.20 583.60 592.00 600.40 608.80 617.20 625.60 634.00 642.40 650.80 659.20 667.60 676.00 684.40 692.80 701.20" y="229" xml:space="preserve">ctop-tui · formhand · pi-robot-cam</text>
-<text x="340.00 348.40 356.80 365.20 373.60 382.00 390.40" y="252" class="k" xml:space="preserve">updated</text>
-<text x="424.00 432.40 440.80 449.20 457.60 466.00 474.40 482.80 491.20 499.60 508.00 516.40 524.80 533.20 541.60 550.00 558.40 566.80 575.20 583.60" y="252" xml:space="preserve">2026-10-12 by action</text>
-<clipPath id="bar"><rect x="340" y="277" width="440" height="12" rx="6"/></clipPath><g clip-path="url(#bar)">
-<rect x="340.0" y="277" width="290.9" height="12" fill="#f1e05a"/>
-<rect x="630.3" y="277" width="139.3" height="12" fill="#3572A5"/>
-<rect x="769.0" y="277" width="6.3" height="12" fill="#e34c26"/>
-<rect x="774.8" y="277" width="5.8" height="12" fill="#89e051"/>
+<text x="424.00 432.40 440.80 449.20 457.60 466.00 474.40 482.80 491.20 499.60 508.00 516.40 524.80 533.20 541.60 550.00 558.40 566.80 575.20 583.60 592.00 600.40 608.80 617.20 625.60 634.00" y="160" xml:space="preserve">formhand@v1.0.0 · 1 tagged</text>
+<text x="340.00 348.40 356.80 365.20 373.60 382.00" y="183" class="k" xml:space="preserve">topics</text>
+<text x="424.00 432.40 440.80 449.20 457.60 466.00 474.40 482.80 491.20 499.60 508.00 516.40 524.80 533.20 541.60 550.00 558.40 566.80 575.20 583.60 592.00 600.40 608.80 617.20 625.60 634.00 642.40 650.80 659.20 667.60 676.00 684.40 692.80" y="183" xml:space="preserve">autofill · battery-monitor · btop</text>
+<text x="340.00 348.40 356.80 365.20 373.60 382.00 390.40 398.80" y="206" class="k" xml:space="preserve">featured</text>
+<text x="424.00 432.40 440.80 449.20 457.60 466.00 474.40 482.80 491.20 499.60 508.00 516.40 524.80 533.20 541.60 550.00 558.40 566.80 575.20 583.60 592.00 600.40 608.80 617.20 625.60 634.00 642.40 650.80 659.20 667.60 676.00 684.40 692.80 701.20" y="206" xml:space="preserve">ctop-tui · formhand · pi-robot-cam</text>
+<text x="340.00 348.40 356.80 365.20 373.60 382.00 390.40" y="229" class="k" xml:space="preserve">updated</text>
+<text x="424.00 432.40 440.80 449.20 457.60 466.00 474.40 482.80 491.20 499.60 508.00 516.40 524.80 533.20 541.60 550.00 558.40 566.80 575.20 583.60" y="229" xml:space="preserve">2026-10-12 by action</text>
+<clipPath id="bar"><rect x="340" y="254" width="440" height="12" rx="6"/></clipPath><g clip-path="url(#bar)">
+<rect x="340.0" y="254" width="290.9" height="12" fill="#f1e05a"/>
+<rect x="630.3" y="254" width="139.3" height="12" fill="#3572A5"/>
+<rect x="769.0" y="254" width="6.3" height="12" fill="#e34c26"/>
+<rect x="774.8" y="254" width="5.8" height="12" fill="#89e051"/>
 </g>
-<rect x="340" y="303" width="30" height="16" rx="3" fill="#232a36"/>
-<rect x="374" y="303" width="30" height="16" rx="3" fill="#c0627a"/>
-<rect x="408" y="303" width="30" height="16" rx="3" fill="#5fa86b"/>
-<rect x="442" y="303" width="30" height="16" rx="3" fill="#d9a441"/>
-<rect x="476" y="303" width="30" height="16" rx="3" fill="#4f8fd6"/>
-<rect x="510" y="303" width="30" height="16" rx="3" fill="#a07cc9"/>
-<rect x="544" y="303" width="30" height="16" rx="3" fill="#39c5cf"/>
-<rect x="578" y="303" width="30" height="16" rx="3" fill="#d0d4da"/>
+<rect x="340" y="280" width="30" height="16" rx="3" fill="#232a36"/>
+<rect x="374" y="280" width="30" height="16" rx="3" fill="#c0627a"/>
+<rect x="408" y="280" width="30" height="16" rx="3" fill="#5fa86b"/>
+<rect x="442" y="280" width="30" height="16" rx="3" fill="#d9a441"/>
+<rect x="476" y="280" width="30" height="16" rx="3" fill="#4f8fd6"/>
+<rect x="510" y="280" width="30" height="16" rx="3" fill="#a07cc9"/>
+<rect x="544" y="280" width="30" height="16" rx="3" fill="#39c5cf"/>
+<rect x="578" y="280" width="30" height="16" rx="3" fill="#d0d4da"/>
 </svg>
