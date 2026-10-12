@@ -39,12 +39,13 @@ HANDLE = "nb"
 NA = "n/a"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Display order; anything else public follows, newest push first. Forks go last.
-ORDER = ["ctop-tui", "formhand", "pi-robot-cam", "jobbot", USER, "spiff-arena"]
+ORDER = ["ctop-tui", "formhand", "pi-robot-cam", "jobbot", "letterstore", USER, "spiff-arena"]
 # Only used with --assume-published (repos that are private right now).
 PENDING = {
     "pi-robot-cam": "Raspberry Pi robot you can watch and drive from a phone",
     "jobbot": "Local job-application driver for Firefox, built on Formhand",
     USER: "Profile README",
+    "letterstore": "Streetwear storefront demo: Next.js 14, Tailwind, static catalog",
 }
 
 # ---- Windows 95 palette (system colours) and fonts
@@ -277,7 +278,13 @@ def window_svg(d, ramp=HEAT):
     o.append(f'<text x="14" y="{listy - 6}" fill="{DK}" class="ui">Public repositories of @{USER}:</text>')
     lw = W - 28
     bevel(o, 14, listy, lw, list_h, raised=False, fill=LT)
-    cols = [(18, 140, "Name"), (158, 424, "Description"), (582, 110, "Pushed"), (692, 60, "Stars"), (752, lw - 752 + 10, "")]
+    # Stars column only when at least one repo has stars; otherwise Description widens.
+    stars = any(r["stars"] for r in rows)
+    if stars:
+        cols = [(18, 140, "Name"), (158, 424, "Description"), (582, 110, "Pushed"), (692, lw - 692 + 10, "Stars")]
+    else:
+        cols = [(18, 140, "Name"), (158, 574, "Description"), (732, lw - 732 + 10, "Pushed")]
+    px = cols[2][0] + 6
     for x, w, t in cols:
         bevel(o, x, listy + 3, w, 20)
         o.append(f'<text x="{x + 6}" y="{listy + 17}" fill="{DK}" class="ui">{t}</text>')
@@ -292,7 +299,7 @@ def window_svg(d, ramp=HEAT):
         nm = clean(r["name"]) + (" (fork)" if r["fork"] else "")
         o.append(f'<text x="24" y="{ty}" fill="{col}" class="ui">{nm}</text>')
         o.append(f'<text x="164" y="{ty}" fill="{col}" class="ui">{clean(r["desc"])}</text>')
-        o.append(f'<text x="588" y="{ty}" fill="{col}" class="ui num">{r["pushed"]}</text>')
+        o.append(f'<text x="{px}" y="{ty}" fill="{col}" class="ui num">{r["pushed"]}</text>')
         if r["stars"]:
             o.append(f'<text x="698" y="{ty}" fill="{col}" class="ui num">{r["stars"]}</text>')
         y += rowh
