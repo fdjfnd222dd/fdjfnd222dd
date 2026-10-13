@@ -91,7 +91,6 @@
 <text x="50" y="361" text-anchor="end" fill="#000000" class="sm">Wed</text>
 <text x="50" y="389" text-anchor="end" fill="#000000" class="sm">Fri</text>
 <text x="58" y="305" fill="#000000" class="sm">Oct</text>
-<rect x="58" y="310" width="11" height="11" fill="#e4e4e4"/>
 <rect x="58" y="324" width="11" height="11" fill="#e4e4e4"/>
 <rect x="58" y="338" width="11" height="11" fill="#e4e4e4"/>
 <rect x="58" y="352" width="11" height="11" fill="#e4e4e4"/>
@@ -469,6 +468,7 @@
 <rect x="772" y="394" width="11" height="11" fill="#e4e4e4"/>
 <rect x="786" y="310" width="11" height="11" fill="#004848"/>
 <rect x="786" y="324" width="11" height="11" fill="#004848"/>
+<rect x="786" y="338" width="11" height="11" fill="#e4e4e4"/>
 <text x="695" y="424" fill="#000000" class="sm">Less</text>
 <rect x="725" y="414" width="11" height="11" fill="#e4e4e4"/>
 <rect x="740" y="414" width="11" height="11" fill="#99cccc"/>
