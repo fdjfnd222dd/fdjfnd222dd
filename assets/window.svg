@@ -94,7 +94,6 @@
 <text x="50" y="381" text-anchor="end" fill="#000000" class="sm">Wed</text>
 <text x="50" y="409" text-anchor="end" fill="#000000" class="sm">Fri</text>
 <text x="58" y="325" fill="#000000" class="sm">Oct</text>
-<rect x="58" y="344" width="11" height="11" fill="#e4e4e4"/>
 <rect x="58" y="358" width="11" height="11" fill="#e4e4e4"/>
 <rect x="58" y="372" width="11" height="11" fill="#e4e4e4"/>
 <rect x="58" y="386" width="11" height="11" fill="#e4e4e4"/>
@@ -472,6 +471,7 @@
 <rect x="786" y="330" width="11" height="11" fill="#004848"/>
 <rect x="786" y="344" width="11" height="11" fill="#004848"/>
 <rect x="786" y="358" width="11" height="11" fill="#4da6a6"/>
+<rect x="786" y="372" width="11" height="11" fill="#e4e4e4"/>
 <text x="695" y="444" fill="#000000" class="sm">Less</text>
 <rect x="725" y="434" width="11" height="11" fill="#e4e4e4"/>
 <rect x="740" y="434" width="11" height="11" fill="#99cccc"/>
@@ -483,7 +483,7 @@
 <path d="M297.5 472V491.5H8" stroke="#ffffff" fill="none" shape-rendering="crispEdges"/>
 <path d="M9.5 491V473.5H297" stroke="#808080" fill="none" shape-rendering="crispEdges"/>
 <path d="M296.5 473V490.5H9" stroke="#c0c0c0" fill="none" shape-rendering="crispEdges"/>
-<text x="14" y="486" fill="#000000" class="ui">1285 contributions, last 365 days</text>
+<text x="14" y="486" fill="#000000" class="ui">1286 contributions, last 365 days</text>
 <path d="M300.5 492V472.5H450" stroke="#000000" fill="none" shape-rendering="crispEdges"/>
 <path d="M449.5 472V491.5H300" stroke="#ffffff" fill="none" shape-rendering="crispEdges"/>
 <path d="M301.5 491V473.5H449" stroke="#808080" fill="none" shape-rendering="crispEdges"/>
