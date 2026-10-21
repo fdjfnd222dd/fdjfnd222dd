@@ -37,7 +37,8 @@ HANDLE = "nb"
 NA = "n/a"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Display order; anything else public follows, newest push first. Forks go last.
-ORDER = ["ctop-tui", "formhand", "pi-robot-cam", "jobbot", "net-toolkit", "letterstore", USER, "spiff-arena"]
+ORDER = ["goodix-550c-linux-debian", "ctop-tui", "net-toolkit", "formhand", "jobbot", "pi-robot-cam", "letterstore",
+         "study-timer", USER, "spiff-arena"]
 # ---- Windows 95 palette (system colours) and fonts
 FACE, DK, MID, LT, NAVY, TEAL = "#c0c0c0", "#000000", "#808080", "#ffffff", "#000080", "#008080"
 UI = "Tahoma, 'MS Sans Serif', Verdana, 'DejaVu Sans', sans-serif"
@@ -270,10 +271,11 @@ def window_svg(d, ramp=HEAT):
     bevel(o, 14, listy, lw, list_h, raised=False, fill=LT)
     # Stars column only when at least one repo has stars; otherwise Description widens.
     stars = any(r["stars"] for r in rows)
+    # Name column fits "goodix-550c-linux-debian"; Description gives up the width.
     if stars:
-        cols = [(18, 140, "Name"), (158, 424, "Description"), (582, 110, "Type"), (692, lw - 692 + 10, "Stars")]
+        cols = [(18, 190, "Name"), (208, 404, "Description"), (612, 100, "Type"), (712, lw - 712 + 10, "Stars")]
     else:
-        cols = [(18, 140, "Name"), (158, 574, "Description"), (732, lw - 732 + 10, "Type")]
+        cols = [(18, 190, "Name"), (208, 524, "Description"), (732, lw - 732 + 10, "Type")]
     px = cols[2][0] + 6
     for x, w, t in cols:
         bevel(o, x, listy + 3, w, 20)
@@ -288,10 +290,10 @@ def window_svg(d, ramp=HEAT):
         ty = y + 14
         nm = clean(r["name"])
         o.append(f'<text x="24" y="{ty}" fill="{col}" class="ui">{nm}</text>')
-        o.append(f'<text x="164" y="{ty}" fill="{col}" class="ui">{clean(r["desc"])}</text>')
+        o.append(f'<text x="{cols[1][0] + 6}" y="{ty}" fill="{col}" class="ui">{clean(r["desc"])}</text>')
         o.append(f'<text x="{px}" y="{ty}" fill="{col}" class="ui">{clean(r["type"])}</text>')
         if r["stars"]:
-            o.append(f'<text x="698" y="{ty}" fill="{col}" class="ui num">{r["stars"]}</text>')
+            o.append(f'<text x="{cols[3][0] + 6}" y="{ty}" fill="{col}" class="ui num">{r["stars"]}</text>')
         y += rowh
     o.append(f'<text x="14" y="{act_y}" fill="{DK}" class="ui">Activity:</text>')
     bevel(o, 14, panel_y, lw, panel_h, raised=False, fill=LT)
@@ -359,8 +361,9 @@ def build_script(d):
     cmd("dir")
     out(" Directory of C:\\GITHUB", t); t += 0.15
     out("", t); t += 0.0
+    nw = max([16] + [len(r["name"]) + 2 for r in d["rows"]])
     for r in d["rows"]:
-        out(f"{r['name']:<16}{'<DIR>':<8}{r['type']}", t); t += 0.14
+        out(f"{r['name']:<{nw}}{'<DIR>':<8}{r['type']}", t); t += 0.14
     out(f"{len(d['rows']):>8} dir(s)", t)
     t += 1.3
     cmd("type stats.txt")
