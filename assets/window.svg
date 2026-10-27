@@ -106,7 +106,6 @@
 <text x="50" y="393" text-anchor="end" fill="#000000" class="sm">Mon</text>
 <text x="50" y="421" text-anchor="end" fill="#000000" class="sm">Wed</text>
 <text x="50" y="449" text-anchor="end" fill="#000000" class="sm">Fri</text>
-<rect x="58" y="370" width="11" height="11" fill="#e4e4e4"/>
 <rect x="58" y="384" width="11" height="11" fill="#e4e4e4"/>
 <rect x="58" y="398" width="11" height="11" fill="#e4e4e4"/>
 <rect x="58" y="412" width="11" height="11" fill="#e4e4e4"/>
@@ -483,7 +482,8 @@
 <rect x="772" y="440" width="11" height="11" fill="#008080"/>
 <rect x="772" y="454" width="11" height="11" fill="#99cccc"/>
 <rect x="786" y="370" width="11" height="11" fill="#e4e4e4"/>
-<rect x="786" y="384" width="11" height="11" fill="#e4e4e4"/>
+<rect x="786" y="384" width="11" height="11" fill="#008080"/>
+<rect x="786" y="398" width="11" height="11" fill="#e4e4e4"/>
 <text x="695" y="484" fill="#000000" class="sm">Less</text>
 <rect x="725" y="474" width="11" height="11" fill="#e4e4e4"/>
 <rect x="740" y="474" width="11" height="11" fill="#99cccc"/>
@@ -495,12 +495,12 @@
 <path d="M297.5 512V531.5H8" stroke="#ffffff" fill="none" shape-rendering="crispEdges"/>
 <path d="M9.5 531V513.5H297" stroke="#808080" fill="none" shape-rendering="crispEdges"/>
 <path d="M296.5 513V530.5H9" stroke="#c0c0c0" fill="none" shape-rendering="crispEdges"/>
-<text x="14" y="526" fill="#000000" class="ui">1329 contributions, last 365 days</text>
+<text x="14" y="526" fill="#000000" class="ui">1345 contributions, last 365 days</text>
 <path d="M300.5 532V512.5H450" stroke="#000000" fill="none" shape-rendering="crispEdges"/>
 <path d="M449.5 512V531.5H300" stroke="#ffffff" fill="none" shape-rendering="crispEdges"/>
 <path d="M301.5 531V513.5H449" stroke="#808080" fill="none" shape-rendering="crispEdges"/>
 <path d="M448.5 513V530.5H301" stroke="#c0c0c0" fill="none" shape-rendering="crispEdges"/>
-<text x="306" y="526" fill="#000000" class="ui">134 active days</text>
+<text x="306" y="526" fill="#000000" class="ui">135 active days</text>
 <path d="M452.5 532V512.5H602" stroke="#000000" fill="none" shape-rendering="crispEdges"/>
 <path d="M601.5 512V531.5H452" stroke="#ffffff" fill="none" shape-rendering="crispEdges"/>
 <path d="M453.5 531V513.5H601" stroke="#808080" fill="none" shape-rendering="crispEdges"/>
