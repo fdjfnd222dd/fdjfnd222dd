@@ -109,7 +109,6 @@
 <text x="50" y="413" text-anchor="end" fill="#000000" class="sm">Mon</text>
 <text x="50" y="441" text-anchor="end" fill="#000000" class="sm">Wed</text>
 <text x="50" y="469" text-anchor="end" fill="#000000" class="sm">Fri</text>
-<rect x="58" y="446" width="11" height="11" fill="#e4e4e4"/>
 <rect x="58" y="460" width="11" height="11" fill="#e4e4e4"/>
 <rect x="58" y="474" width="11" height="11" fill="#e4e4e4"/>
 <text x="72" y="385" fill="#000000" class="sm">Nov</text>
@@ -487,6 +486,7 @@
 <rect x="786" y="432" width="11" height="11" fill="#4da6a6"/>
 <rect x="786" y="446" width="11" height="11" fill="#e4e4e4"/>
 <rect x="786" y="460" width="11" height="11" fill="#e4e4e4"/>
+<rect x="786" y="474" width="11" height="11" fill="#e4e4e4"/>
 <text x="695" y="504" fill="#000000" class="sm">Less</text>
 <rect x="725" y="494" width="11" height="11" fill="#e4e4e4"/>
 <rect x="740" y="494" width="11" height="11" fill="#99cccc"/>
